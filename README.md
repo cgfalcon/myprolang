@@ -1,7 +1,7 @@
 
 #myprolang
 
-My First Programming language
+My First Programming language.
 
 ## Feature
 
