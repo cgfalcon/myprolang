@@ -5,11 +5,21 @@ package org.cgfalcon.myprolang.calc.lexer;
  */
 public enum TokenType {
 
-    EOF,
-    LEFT_BRAKET,
-    RIGHT_BRAKET,
+    EOF("EOF"),
+    LEFT_BRAKET("("),
+    RIGHT_BRAKET(")"),
 
-    NUM,
-    OP_ADD_TOKEN,
-    ID, OP_MUL_TOKEN
+    NUM("NUM"),
+    OP_ADD_TOKEN("+"),
+    ID("ID"),
+    OP_MUL_TOKEN("*"),
+    OP_SUB_TOKEN("-"),
+    SEMI(";"),
+    EQUAL("=");
+
+    private TokenType(String token) {
+        this.name = token;
+    }
+
+    private String name;
 }

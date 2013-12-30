@@ -1,10 +1,5 @@
 package org.cgfalcon.myprolang.calc.lexer;
 
-/**
- * Created by Falcon on 13-12-21.
- */
-
-
 import org.cgfalcon.myprolang.calc.Lexer;
 
 /**
@@ -31,10 +26,16 @@ public class CalcLexer extends Lexer {
     public Token nextToken() {
         while (c != EOF) {
             switch (c) {
-                case ' ':case '\r':case '\n':case '\t': WS(); continue;
+                case ' ': case '\t': case '\r': case '\n':WS(); continue;
+                case ';':
+                    consume();
+                    return new Token(position - 1, 1, ";", TokenType.SEMI);
                 case '+':
                     consume();
                     return new Token(position - 1, 1, "+", TokenType.OP_ADD_TOKEN);
+                case '-':
+                    consume();
+                    return new Token(position - 1, 1, "-", TokenType.OP_SUB_TOKEN);
                 case '*':
                     consume();
                     return new Token(position - 1, 1, "*", TokenType.OP_MUL_TOKEN);
@@ -44,9 +45,14 @@ public class CalcLexer extends Lexer {
                 case ')':
                     consume();
                     return new Token(position - 1, 1, ")", TokenType.RIGHT_BRAKET);
+                case '=':
+                    consume();
+                    return new Token(position - 1, 1, "=", TokenType.EQUAL);
                 default:
                     if (isDigit(c)) {
                         return Num();
+                    } else if (isLetter(c)) {
+                        return ID();
                     }
                     throw new IllegalStateException("invalid character: " + c);
             }
@@ -76,12 +82,6 @@ public class CalcLexer extends Lexer {
                 if (c == '.' && status == NumTokenStatus.NUM_INT) {
                     status = NumTokenStatus.DOT;
                 } else {
-                    switch (c) {
-                        case ' ':case '\r':case '\n':case '\t': WS(); break;
-                        default:
-                            throw new IllegalStateException("Unacceptable Char: " + c + " for Token NUM");
-
-                    }
                     break;
                 }
             }
@@ -99,7 +99,7 @@ public class CalcLexer extends Lexer {
             buff.append(c);
             consume();
             if (!isLetter(c)) {
-                throw new IllegalStateException("Unacceptable Char: " + c + " for Token ID");
+               break;
             }
         } while (isLetter(c));
         return new Token(startPx, 1, buff.toString(), TokenType.ID);
