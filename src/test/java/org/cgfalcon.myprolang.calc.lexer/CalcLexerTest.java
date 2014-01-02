@@ -69,7 +69,7 @@ public class CalcLexerTest {
         assertEquals(TokenType.OP_ADD_TOKEN, tokenAdd.getKind());
 
         Token tokenOperand = lexer.nextToken();
-        assertEquals(new Token(6, 1, "0.23", TokenType.NUM), tokenOperand);
+        assertEquals(new Token(7, 1, "0.23", TokenType.NUM), tokenOperand);
 
     }
 
@@ -80,7 +80,21 @@ public class CalcLexerTest {
         lexer.setLine(line);
 
         Token token = lexer.nextToken();
-
         assertEquals(new Token(0, 1, "dbd", TokenType.ID), token);
+    }
+
+    @Test
+    public void testAssign() {
+       String line = "x = 10";
+        lexer.setLine(line);
+
+        Token tokenX = lexer.nextToken();
+        assertEquals(new Token(0, 1, "x", TokenType.ID), tokenX);
+
+        Token tokenEqual = lexer.nextToken();
+        assertEquals(new Token(2, 1, "=", TokenType.EQUAL), tokenEqual);
+
+        Token tokenNum = lexer.nextToken();
+        assertEquals(new Token(4, 1, "10", TokenType.NUM), tokenNum);
     }
 }
