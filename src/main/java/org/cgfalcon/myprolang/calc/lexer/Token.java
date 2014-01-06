@@ -22,8 +22,11 @@ public class Token {
 
     public String text;
 
-    public Token() {
-
+    public Token(String text, TokenType tokenType) {
+        this.text = text;
+        this.kind = tokenType;
+        this.pos = 0;
+        this.line = 0;
     }
 
 
