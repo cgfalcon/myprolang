@@ -492,7 +492,23 @@ data and plan on using External Tree Visitor. The normalized child list makes it
 
 **This pattern implements an abstract syntax tree (AST) using more than a single node data type and with an irregular child list representation.**
 
+In the implementation of its child pointers. Instead of a uniform list of children, each node data type has specific (named) child fields. In this sense, the child pointers are irregular. In some cases, named fields lead to more readable code. For example, methods can refer to left and right instead of, say, `children[0]` and `children[1]`.
 
+在建树的过程中，大多数人都会选用这种模式，因为在不同类型的Class中添加不同的字段看上去总是那么正常。
+
+对运算符节点的左右子树严格区分，例如
+
+    class AddNode extends ExprNode {
+        ExprNode left, right;
+        .....
+    }
+       
+而 Normalized Heterogenous AST 则是这样
+
+    class AddNode extends ExprNode {
+        List<AST> children;
+        ...
+    }
 
 ###2014/1/7
 下面要开始看对 AST 的遍历了，在遍历过程中可能会对树中的节点进行修改和更新，例如进行常量折叠等
@@ -533,7 +549,7 @@ data and plan on using External Tree Visitor. The normalized child list makes it
 
 visiting a tree, we mean executing some actions on the nodes of a tree.  The order in which we traverse the nodes is important because that affects the order in which we execute the actions. 
 
-下面来回顾一下树遍历的方法，对于表达式 1 + 2, 根据遍历方法的不同可以产生不同的序列
+下面来回顾一下二叉树遍历的方法，对于表达式 1 + 2, 根据遍历方法的不同可以产生不同的序列
 
 - 前序遍历 (+ 1 2)，先访问父节点再访问子节点
 - 中序遍历 (1 + 2)，先访问子节点然后父节点，最后是剩下右子节点
@@ -546,3 +562,155 @@ visiting a tree, we mean executing some actions on the nodes of a tree.  The ord
 **Visiting a node means to execute an action somewhere between discovering and finishing that node.** But, that same discovery sequence can generate three different tree traversals (node visitation sequences). It all depends on where we put actions in walk( ).
 
 **Difference between Tree Walking and Visiting**
+
+// Page 120  
+
+没看明白
+
+**Embedded Walker VS External Tree Visitor**
+
+Embedded Walker 需要在节点中添加动作，这样可也能会很明了的知道在遍历这个节点的时候做了些什么事，但是如果想基于树提供不同的一套动作，那是不是就得在源码里把所有节点都改一遍了？ **长于观察，短于扩展**
+
+External Tree Visitor 将对树的遍历操作放到专门的visitor中，这样方便对同一个树提供不同的访问算法，但是正好和 Embedded 相反，访问逻辑放在节点外一定程度上增加了模糊性，多绕几次就晕了。 **长于扩展, 短于观察**
+
+#### Walking Trees and Rewriting Trees 使用的Patterns
+
+Waling Tree 和 Rewriting Tree 的目的都是对希望对树上的节点进行操作，所以也就有对所有节点的操作，也就有对部分节点的操作，因此需要Grammer或者Pattern来指定需要操作的节点的类型
+
+- **Embedded Heterogeneous Tree Walker**
+
+    Embedding walking methods in tree nodes is the simplest mechanism for building a tree walker
+- **External Tree Visitor**
+
+     Visitors are useful for collecting information or doing some simple interpretation, such as expression evaluation. They are not well suited to tree pattern matching applications. Visitors simply walk the tree node by node.
+     
+    Visitor 只能遍历树中节点，但是并不能完成 tree的 pattern match
+- **Tree Grammar**
+
+    Tree grammars specify the structure of entire trees. They are most effective when we need to execute actions in many or most rules. For example, tree-walking code generators typically need to emit code for every subtree.
+- **Tree Pattern Matcher**
+
+     To operate only on a specific subset of an AST structures, we can use a tree pattern matcher.
+     
+#### Embeded Heterogeneous Tree Walker
+
+在树中节点添加一些递归调用的方法。如前面所讲，这个方法在节点规模小的时候简单直观，不过要动态改变对树遍历的这些操作的话基本不可能。
+
+#### External Tree Visitor
+
+Visitors combine tree walking and action execution code outside the AST node definitions.we can change the functionality of the tree walker without having to change the AST class definitions and can even switch visitors on the fly. An external visitor can walk either heterogeneous or homogeneous AST nodes.
+
+实现的方法有两种：
+
+1. 根据节点的类型来构建，这种是比较传统的Visitor Pattern
+2. 根据Token的类型来构建
+
+先来看传统的Visior
+
+**根据节点类型的Visitor**
+
+> Visitor Pattern: relies on a “double-dispatch” method within each AST node. The double-dispatch method redirects `visit( )` calls on a node to an appropriate method in a visitor servicing that node type. The visitor is like a set of callback methods. 
+
+典型的visitor流程是这样的：
+
+    for a Node, use a visitor  ---->  Node.visit(visitor) --- dispatch to ---> visitor.visit(Node)
+    
+书中例子
+
+    /
+    **
+    A generic heterogeneous tree node used in our vector math trees
+    *
+    /
+    public abstract class VecMathNode extends HeteroAST {
+        public VecMathNode() {;}
+        public VecMathNode(Token t) { this.token = t; }
+        public abstract void visit(VecMathVisitor visitor); // dispatcher
+    }
+    
+    然后要在所有节点加入
+    
+    public void visit(VecMathVisitor visitor) { visitor.visit(this); }
+    
+    Visitor的定义
+    
+    public interface VecMathVisitor {
+        void visit(AssignNode n);
+        void visit(PrintNode n);
+        void visit(StatListNode n);
+        void visit(VarNode n);
+        void visit(AddNode n);
+        void visit(DotProductNode n);
+        void visit(IntNode n);
+        void visit(MultNode n);
+        void visit(VectorNode n);
+    }
+    
+不过这种方法需要在外部 Visitor 中利用多态的特性构造针对每种类型的 visit 方法。可想而知，如果节点类型很多的话，是多无聊的事，(-、-)。visitor 转来转去的也容易晕。
+
+这种方法同样无法完全将 visitor 和AST本身分开，因为需要侵入性的加入一个 `visit()` 到每个节点中
+
+**根据Token类型的Visitor**
+
+we can distinguish between tokens using the token type, we can also distinguish between AST nodes using the token type. By switching on the token type rather than the AST node type, we can avoid the `visit()` method in each AST node
+
+我们可以只在visitor中放一个visit方法即可，不需要侵入Node节点
+
+    public void print(VecMathNode n) {
+        switch ( n.token.type ) {
+        case Token.ID : print((VarNode)n); break;
+        case Token.ASSIGN : print((AssignNode)n); break;
+        case Token.PRINT : print((PrintNode)n); break;
+        case Token.PLUS : print((AddNode)n); break;
+        case Token.MULT : print((MultNode)n); break;
+        case Token.DOT : print((DotProductNode)n); break;
+        case Token.INT : print((IntNode)n); break;
+        case Token.VEC : print((VectorNode)n); break;
+        case Token.STAT_LIST : print((StatListNode)n); break;
+        default :
+        // catch unhandled node types
+        throw new UnsupportedOperationException("Node " +
+        n.getClass().getName()+ " not handled" );
+        }
+    }
+    
+#### Tree Grammar
+
+Tree grammars are a terse and formal way of building an external visitor. Visitors generated from tree grammars are usually called tree parsers because they are the two-dimensional analog of conventional parsers.
+
+Tree grammars do not care about the implementation language
+classes used to represent AST nodes (they work with both homogeneous and heterogeneous AST nodes). Instead, they rely on token type differences between AST node token payloads to distinguish different kinds of nodes
+
+Tree grammars 同样是可以借助生成工具来定义的
+
+书中借用ANTLR3 进行了实现，不过同样是容易看懂的，跳过
+
+#### Tree Pattern Matcher
+
+This pattern walks trees, triggering actions or tree rewrites as it encounters tree patterns of interest. The process of matching and rewriting trees is formally called term rewriting.
+
+通过定义Pattern -> action，在遍历树的时候，对于符合Pattern的就采用和Pattern对应的acion
+
+Tree Pattern Match 和 Tree Grammar 的不同之处：
+
+1. We have to specify patterns only for the subtrees we care about.
+2. We don’t need to direct the tree walk.
+
+A tree pattern matcher is analogous to text rewriting tools such as awk, sed, and perl.
+
+A tree grammar needs a pattern for each subtree. The grammar rules include traversal instructions just like a hand-built visitor 
+
+我们感兴趣的是 **输入的Pattern** 以及 **匹配时的动作**。
+
+简而言之，Tree Grammar 关注整体每个subtree的结构，但是 Tree Pattern Matcher 关注局部及其操作动作。
+
+这一节关于Rewriting 的例子还是不错的，后面补上
+
+// TODO: Rewriting Examples
+
+
+### 2013/1/13
+
+前几天玩了下《信长之野望》，耽搁了些学习时间，罪过罪过。
+
+今天开始看 **Tracking and Identifying Program Symbols**
