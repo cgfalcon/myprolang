@@ -132,7 +132,7 @@ LL(n)
 ### 2013/12/28
 在实现Parser的时候遇到了点坎，不知道如何组织Token，都说语法分析最后要生成树，不过总是拿不定主意到底怎么做，难道一个语法中的每个规则都生成一个类？
 
-想不出来回头又参考了《自制编程语言》里面crowbar的实现，发现里面将不同的表达式(expression)和语句(statement) 分成了不同的类型，并没有生成很多类（虽然它是c语言实现的(-__-)b）。这么一看又勾起了我到底如何细致的区分 expression 和 statement 产生了疑问，遂google 之。
+想不出来回头又参考了《自制变成语言》里面crowbar的实现，发现里面将不同的表达式(expression)和语句(statement) 分成了不同的类型，并没有生成很多类（虽然它是c语言实现的(-__-)b）。这么一看又勾起了我到底如何细致的区分 expression 和 statement 产生了疑问，遂google 之。
 
 **expression** 通常会产生一个值。可以包含变量，操作符，以及方法调用。
 
@@ -709,8 +709,120 @@ A tree grammar needs a pattern for each subtree. The grammar rules include trave
 // TODO: Rewriting Examples
 
 
-### 2013/1/13
+### 2014/1/13
 
 前几天玩了下《信长之野望》，耽搁了些学习时间，罪过罪过。
 
 今天开始看 **Tracking and Identifying Program Symbols**
+
+从这部分开始就涉及到语义分析(semantic analysis)的内容了.
+
+Semantic analysis is just a fancy way to say we’re “sniffing a program to see whether it makes sense.” The term semantics is synonymous with “meaning.”
+
+简单来说就是看程序是否正确，该出现的是否出现在其该出现的地方。在这一部分会讲到如何实现静态类型检查，不过要实现这个规则还需要一些基础建设要做，比如符号表。要完成语义分析，需要一个记录 symbol (A symbol is just a name for a program entity like a variable or method.) 的地方。
+
+computer language sentences can define and reference symbols in code blocks. At the end of the code block, the symbols go out of scope
+
+保存符号(symbol) 信息的数据结构叫做 symbol table
+
+### 2014/1/14
+
+这一部分涉及到的Pattern 有两个，一个讲单独作用域的，两一个讲多作用域的
+
+- Symbol Table for Monolithic Scope
+
+    All symbols exist within a single scope (set of symbols). Simple property files and early BASIC are the best examples
+- Symbol Table for Nested Scopes
+
+    There are multiple scopes and scopes can nest inside other scopes. C is a typical language that has nested scopes. Scopes start and end at the start and end of language structures such as functions.
+    
+要完成上面两个Pattern首先需要了解： **如何表示symbol**, **如何将symbol放入其所属的符号表**, **如何解析symbol的定义**
+
+看到这里，我就想明白Token和Symbol的区别，因为看上去都是某种操作的最小单位，现在理解是，它们两个尽管相似，但是属于不同的阶段。
+
+#### 如何组织程序中出现的符号
+
+例如对于下面的程序
+
+    class T { ... }; // define class T
+    T f() { ... } // define function f returning type T
+    int x; // define variable x of type int 
+    
+它可能需要用如下的symbol表示
+
+    Type c = new ClassSymbol("T" ); // define class
+    MethodSymbol m = new MethodSymbol("f" , c); // define method
+    Type intType = new BuiltInTypeSymbol("int" ); // define int type
+    VariableSymbol v = new VariableSymbol("x" , intType); // define var x
+    
+Symbol的属性:
+
+- Name: Symbols are usually identifiers like x, f, and T, but they can be operators too.
+- Category: That is, what kind of thing the symbol is. Is it a class, method, variable, label, and so on.  例如需要判断只有在 method 的类型上才能进行方法调用
+- Type: To validate operation x+y, for example, we need to know the
+types of x and y. 动态语言（如Python)在运行时才知道变量类型，静态语言如 Java则是在编译的时候就知道变量类型
+
+#### Symbol Table for Monolithic Scope
+
+This pattern builds a symbol table for a language with a single, flat scope. This pattern is suitable for simple programming languages (without functions), configuration files, small graphics languages, and other small DSLs.
+
+#### Symbol Table for Nested Scopes
+
+This pattern tracks symbols and builds a **scope tree** for languages with multiple, possibly nested scopes.
+
+Programming language functions are a good example of nested scopes.
+
+也就是说要实现function则必须使用这个模式
+
+看例程
+
+    int i = 9;
+    float f(int x, float y)
+    {
+      float i;
+      { float z = x+y; i = z; }
+      { float z = i+1; i = z; }
+      return i;
+    }
+    void g()
+    {
+      f(i,2);
+    }
+    
+对于这个简单的程序，类层次是这样的
+
+![symbol_nested_scopes.png](imgs/implement language/symbol_nested_scopes.png "symbo_nested_scopes")
+
+其中 MethodSymbol 同时既是Symbol 又是 Scope.
+
+Methods have two scopes actually: one for the parameters (the MethodSymbol itself) and one for its local variables (a LocalScope whose parent is the MethodSymbol).
+
+这一节终于看到整个语法的过程是怎么串联的了
+
+### 2014/1/15
+
+书中提到的push 和 pop 并不是有一个实际的操作栈，push是通过 new 一个新的Scope 然后将当前的scope提供给新的scope作为参数。pop则是返回当前scope的外层scope，类似弹栈，弹出的scope也就是当时构建scope传进去的参数
+
+// TODO: Antlr4 实现代码
+
+飞快的略过。
+
+下面就看 Manageing Symbol Table for Data Aggregates
+
+将要介绍的是 如何处理数据集合，例如Class， structs。 这一部分的后面主要讲静态类型检查的实现。看完这两部分就可以动手实现下到目前为止的内容，主要就是先把Tree构建出来，包括语义分析。
+
+### 2014/1/17
+
+昨天发布，累死了，没时间看。今天继续。
+
+静态类型检查先在书中折个脚，马上开始ANTLR 4 的学习，否则再继续看理论恐怕又要半途而非，(-__-)b
+
+重新看《The Definitely ANTLR 4 Reference》，因为之前加了很多基础知识的铺垫，看起来容易多了，学习东西果然还是要循序渐进啊，恩恩。
+
+不同于 ANTLR 3 的是， 4 的设计跟方便扩展，因为支持将对 Tree 的访问放到 Grammar 文件外面，保证了语法文件的干净，同时也方便扩展。当然为了向前兼容，4 还是支持在语法文件中使用代码段的。
+
+另外 4 的书里并没有讲解AST的内容，可能是书中内容侧重于语法讲解。不过现在看了第一章的概览，大致理解为可以讲Grammar文件里的代码片段或者Actions 放到Visitor中去。
+
+引用一段 递归下降(recursive-decent) 的解释
+
+> descent: refers to the fact that parsing begins at the root of a parse tree and proceeds toward the leaves(tokens)
